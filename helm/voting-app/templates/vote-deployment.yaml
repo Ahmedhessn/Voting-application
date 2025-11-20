@@ -1,0 +1,71 @@
+{{- if .Values.vote.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "voting-app.fullname" . }}-vote
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "voting-app.labels" . | nindent 4 }}
+    app: vote
+    tier: frontend
+spec:
+  replicas: {{ .Values.vote.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "voting-app.selectorLabels" . | nindent 6 }}
+      app: vote
+      tier: frontend
+  template:
+    metadata:
+      labels:
+        {{- include "voting-app.selectorLabels" . | nindent 8 }}
+        app: vote
+        tier: frontend
+    spec:
+      {{- with .Values.security }}
+      securityContext:
+        runAsNonRoot: {{ .runAsNonRoot }}
+        runAsUser: {{ .runAsUser }}
+        fsGroup: {{ .fsGroup }}
+        seccompProfile:
+          type: RuntimeDefault
+      {{- end }}
+      containers:
+      - name: vote
+        image: "{{ .Values.vote.image.repository }}:{{ .Values.vote.image.tag }}"
+        imagePullPolicy: {{ .Values.vote.image.pullPolicy }}
+        ports:
+        - containerPort: 80
+          name: http
+        env:
+        - name: OPTION_A
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "voting-app.fullname" . }}-config
+              key: OPTION_A
+        - name: OPTION_B
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "voting-app.fullname" . }}-config
+              key: OPTION_B
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "voting-app.fullname" . }}-config
+              key: REDIS_HOST
+        resources:
+          {{- toYaml .Values.vote.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 5
+{{- end }}
+

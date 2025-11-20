@@ -1,0 +1,66 @@
+{{- if .Values.result.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "voting-app.fullname" . }}-result
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "voting-app.labels" . | nindent 4 }}
+    app: result
+    tier: frontend
+spec:
+  replicas: {{ .Values.result.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "voting-app.selectorLabels" . | nindent 6 }}
+      app: result
+      tier: frontend
+  template:
+    metadata:
+      labels:
+        {{- include "voting-app.selectorLabels" . | nindent 8 }}
+        app: result
+        tier: frontend
+    spec:
+      {{- with .Values.security }}
+      securityContext:
+        runAsNonRoot: {{ .runAsNonRoot }}
+        runAsUser: {{ .runAsUser }}
+        fsGroup: {{ .fsGroup }}
+        seccompProfile:
+          type: RuntimeDefault
+      {{- end }}
+      containers:
+      - name: result
+        image: "{{ .Values.result.image.repository }}:{{ .Values.result.image.tag }}"
+        imagePullPolicy: {{ .Values.result.image.pullPolicy }}
+        ports:
+        - containerPort: 4000
+          name: http
+        env:
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "voting-app.fullname" . }}-config
+              key: PORT
+        - name: POSTGRES_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "voting-app.fullname" . }}-secrets
+              key: postgres-url
+        resources:
+          {{- toYaml .Values.result.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 4000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 4000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+{{- end }}
+

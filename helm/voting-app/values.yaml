@@ -1,0 +1,158 @@
+# Default values for voting-app
+# This is a YAML-formatted file.
+
+global:
+  environment: dev
+  imageRegistry: ""
+  imagePullSecrets: []
+
+# Namespace configuration
+namespace:
+  create: true
+  name: voting-app
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  hosts:
+    - host: voting-app.local
+      paths:
+        - path: /vote
+          pathType: Prefix
+        - path: /result
+          pathType: Prefix
+
+# Vote service configuration
+vote:
+  enabled: true
+  image:
+    repository: vote
+    tag: v2
+    pullPolicy: IfNotPresent
+  replicaCount: 2
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+  env:
+    OPTION_A: "Cats"
+    OPTION_B: "Dogs"
+
+# Result service configuration
+result:
+  enabled: true
+  image:
+    repository: result
+    tag: v2
+    pullPolicy: IfNotPresent
+  replicaCount: 2
+  service:
+    type: ClusterIP
+    port: 4000
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+  env:
+    PORT: "4000"
+
+# Worker service configuration
+worker:
+  enabled: true
+  image:
+    repository: worker
+    tag: v2
+    pullPolicy: IfNotPresent
+  replicaCount: 2
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+
+# PostgreSQL configuration
+postgresql:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "15-alpine"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "1000m"
+  auth:
+    database: postgres
+    username: postgres
+    password: postgres
+    existingSecret: ""
+    secretKeys:
+      adminPasswordKey: postgres-password
+
+# Redis configuration
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: "7-alpine"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  persistence:
+    enabled: false
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+
+# Security configuration
+security:
+  podSecurityPolicy:
+    enabled: false
+  podSecurityStandards:
+    enforce: restricted
+    audit: restricted
+    warn: restricted
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+# Network policies
+networkPolicy:
+  enabled: true
+  backendIsolation: true
+  databaseIsolation: true
+
+# Service account
+serviceAccount:
+  create: true
+  name: ""
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1

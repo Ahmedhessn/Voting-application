@@ -1,0 +1,23 @@
+{{- if .Values.postgresql.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "voting-app.labels" . | nindent 4 }}
+    app: postgres
+    tier: backend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgres
+  selector:
+    {{- include "voting-app.selectorLabels" . | nindent 4 }}
+    app: postgres
+    tier: backend
+{{- end }}
+

@@ -1,0 +1,22 @@
+{{- if .Values.podDisruptionBudget.enabled }}
+{{- range $app := list "vote" "result" "worker" }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "voting-app.fullname" $ }}-{{ $app }}-pdb
+  namespace: {{ $.Values.namespace.name }}
+  labels:
+    {{- include "voting-app.labels" $ | nindent 4 }}
+spec:
+  {{- if $.Values.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ $.Values.podDisruptionBudget.minAvailable }}
+  {{- else }}
+  maxUnavailable: 1
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "voting-app.selectorLabels" $ | nindent 6 }}
+      app: {{ $app }}
+{{- end }}
+{{- end }}
+
