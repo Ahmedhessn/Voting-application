@@ -30,9 +30,19 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       {{- end }}
+      {{- if .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- range .Values.global.imagePullSecrets }}
+        - name: {{ . }}
+        {{- end }}
+      {{- end }}
       containers:
       - name: result
+        {{- if .Values.global.imageRegistry }}
+        image: "{{ .Values.global.imageRegistry }}/{{ .Values.result.image.repository }}:{{ .Values.result.image.tag }}"
+        {{- else }}
         image: "{{ .Values.result.image.repository }}:{{ .Values.result.image.tag }}"
+        {{- end }}
         imagePullPolicy: {{ .Values.result.image.pullPolicy }}
         ports:
         - containerPort: 4000

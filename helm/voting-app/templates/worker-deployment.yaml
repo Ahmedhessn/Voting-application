@@ -30,9 +30,19 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       {{- end }}
+      {{- if .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- range .Values.global.imagePullSecrets }}
+        - name: {{ . }}
+        {{- end }}
+      {{- end }}
       containers:
       - name: worker
+        {{- if .Values.global.imageRegistry }}
+        image: "{{ .Values.global.imageRegistry }}/{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag }}"
+        {{- else }}
         image: "{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag }}"
+        {{- end }}
         imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
         env:
         - name: POSTGRES_CONNECTION_STRING

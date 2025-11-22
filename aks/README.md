@@ -25,9 +25,13 @@ This directory contains Kubernetes manifests and deployment scripts for deployin
 
 ### Deployment Scripts
 
-- **deploy.sh** - Bash script for Linux/Mac deployment automation
-- **deploy.ps1** - PowerShell script for Windows deployment automation
-- **DEPLOYMENT_GUIDE.md** - Comprehensive step-by-step deployment guide
+- **deploy.sh** - Bash script for Linux/Mac deployment automation (kubectl)
+- **deploy.ps1** - PowerShell script for Windows deployment automation (kubectl)
+- **deploy-helm.sh** - Bash script for Linux/Mac Helm deployment automation
+- **deploy-helm.ps1** - PowerShell script for Windows Helm deployment automation
+- **DEPLOYMENT_GUIDE.md** - Comprehensive step-by-step deployment guide (kubectl)
+- **HELM_DEPLOYMENT_GUIDE.md** - Comprehensive Helm deployment guide
+- **HELM_QUICK_START.md** - Quick start guide for Helm deployment
 
 ## Quick Start
 
@@ -38,7 +42,36 @@ This directory contains Kubernetes manifests and deployment scripts for deployin
 3. Docker installed
 4. Azure subscription with appropriate permissions
 
-### Option 1: Automated Deployment (Recommended)
+### Option 1: Helm Deployment (Recommended)
+
+Helm provides better management, versioning, and configuration management.
+
+#### Linux/Mac:
+
+```bash
+cd ../helm/voting-app
+chmod +x ../../aks/deploy-helm.sh
+../../aks/deploy-helm.sh
+```
+
+Or manually:
+
+```bash
+cd ../helm/voting-app
+# Update values-aks.yaml with your ACR name
+helm install voting-app . --namespace voting-app --create-namespace --values values-aks.yaml
+```
+
+#### Windows:
+
+```powershell
+cd ..\helm\voting-app
+..\..\aks\deploy-helm.ps1
+```
+
+See [HELM_DEPLOYMENT_GUIDE.md](./HELM_DEPLOYMENT_GUIDE.md) or [HELM_QUICK_START.md](./HELM_QUICK_START.md) for detailed instructions.
+
+### Option 2: kubectl Deployment
 
 #### Linux/Mac:
 
@@ -53,7 +86,7 @@ chmod +x deploy.sh
 .\deploy.ps1
 ```
 
-### Option 2: Manual Deployment
+### Option 3: Manual Deployment
 
 Follow the detailed instructions in [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
 
@@ -197,6 +230,45 @@ Common issues:
 7. Enable pod security policies
 8. Configure backup and disaster recovery
 
+## Deployment Methods
+
+### Helm (Recommended)
+
+Helm provides:
+
+- Better configuration management with values files
+- Easy upgrades and rollbacks
+- Template-based manifests
+- Version control for releases
+
+**Quick Start:**
+
+```bash
+cd ../helm/voting-app
+helm install voting-app . --namespace voting-app --create-namespace --values values-aks.yaml
+```
+
+See [HELM_DEPLOYMENT_GUIDE.md](./HELM_DEPLOYMENT_GUIDE.md) for complete instructions.
+
+### kubectl
+
+Direct Kubernetes manifest deployment:
+
+- Full control over individual resources
+- No additional tooling required
+- Good for learning Kubernetes
+
+**Quick Start:**
+
+```bash
+kubectl apply -k .
+```
+
+See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) for complete instructions.
+
 ## Support
 
-For detailed instructions, see [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
+For detailed instructions:
+
+- **Helm**: See [HELM_DEPLOYMENT_GUIDE.md](./HELM_DEPLOYMENT_GUIDE.md) or [HELM_QUICK_START.md](./HELM_QUICK_START.md)
+- **kubectl**: See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) or [QUICK_START.md](./QUICK_START.md)

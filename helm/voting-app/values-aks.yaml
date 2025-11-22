@@ -1,33 +1,45 @@
-# Default values for voting-app
-# This is a YAML-formatted file.
+# AKS-specific values for voting-app
+# This file contains Azure Kubernetes Service optimized configurations
 
 global:
-  environment: dev
-  # Azure Container Registry (ACR) login server
+  environment: aks
+  # Set this to your Azure Container Registry login server
   # Example: myregistry.azurecr.io
-  imageRegistry: ""
-  # Image pull secrets for private registries
-  # Example: ["acr-secret"]
+  imageRegistry: "<ACR_NAME>.azurecr.io"
+  # Image pull secrets (optional if AKS is attached to ACR)
   imagePullSecrets: []
+  # Uncomment and set if using ACR pull secret
+  # imagePullSecrets: ["acr-secret"]
 
 # Namespace configuration
 namespace:
   create: true
   name: voting-app
 
-# Ingress configuration
+# Ingress configuration for AKS
 ingress:
   enabled: true
+  # Use nginx for NGINX Ingress Controller
+  # Or azure-application-gateway for Application Gateway Ingress Controller
   className: nginx
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    # For Application Gateway, use:
+    # appgw.ingress.kubernetes.io/ssl-redirect: "true"
+    # appgw.ingress.kubernetes.io/backend-protocol: "http"
   hosts:
-    - host: voting-app.local
+    - host: voting-app.local  # Change to your domain
       paths:
         - path: /vote
           pathType: Prefix
         - path: /result
           pathType: Prefix
+  # Uncomment for TLS
+  # tls:
+  #   - secretName: voting-app-tls-secret
+  #     hosts:
+  #       - voting-app.yourdomain.com
 
 # Vote service configuration
 vote:
@@ -35,7 +47,7 @@ vote:
   image:
     repository: vote
     tag: v2
-    pullPolicy: Always  # Use Always for ACR to ensure latest images
+    pullPolicy: Always
   replicaCount: 2
   service:
     type: ClusterIP
@@ -57,7 +69,7 @@ result:
   image:
     repository: result
     tag: v2
-    pullPolicy: Always  # Use Always for ACR to ensure latest images
+    pullPolicy: Always
   replicaCount: 2
   service:
     type: ClusterIP
@@ -78,7 +90,7 @@ worker:
   image:
     repository: worker
     tag: v2
-    pullPolicy: Always  # Use Always for ACR to ensure latest images
+    pullPolicy: Always
   replicaCount: 2
   resources:
     requests:
@@ -99,7 +111,7 @@ postgresql:
   persistence:
     enabled: true
     size: 10Gi
-    # Use managed-csi for AKS (default storage class)
+    # AKS default storage class
     storageClass: "managed-csi"
   resources:
     requests:
@@ -111,6 +123,7 @@ postgresql:
   auth:
     database: postgres
     username: postgres
+    # IMPORTANT: Change this in production!
     password: postgres
     existingSecret: ""
     secretKeys:
@@ -125,7 +138,7 @@ redis:
     pullPolicy: IfNotPresent
   replicaCount: 1
   persistence:
-    enabled: false
+    enabled: false  # Use emptyDir for development
   resources:
     requests:
       memory: "128Mi"
@@ -161,3 +174,4 @@ serviceAccount:
 podDisruptionBudget:
   enabled: false
   minAvailable: 1
+
