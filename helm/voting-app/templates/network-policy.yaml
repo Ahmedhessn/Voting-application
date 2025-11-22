@@ -1,5 +1,6 @@
 {{- if .Values.networkPolicy.enabled }}
 {{- if .Values.networkPolicy.backendIsolation }}
+---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

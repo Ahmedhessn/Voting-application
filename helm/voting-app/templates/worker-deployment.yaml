@@ -65,6 +65,9 @@ spec:
             - "ps aux | grep -v grep | grep dotnet"
           initialDelaySeconds: 30
           periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
         readinessProbe:
           exec:
             command:
@@ -73,5 +76,8 @@ spec:
             - "ps aux | grep -v grep | grep dotnet"
           initialDelaySeconds: 10
           periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+          successThreshold: 1
 {{- end }}
 

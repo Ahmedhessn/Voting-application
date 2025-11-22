@@ -29,3 +29,28 @@ output "ingress_nginx_status" {
   value       = helm_release.ingress_nginx.status
 }
 
+output "acr_login_server" {
+  description = "Azure Container Registry login server"
+  value       = var.deploy_to_azure ? azurerm_container_registry.main[0].login_server : null
+}
+
+output "acr_name" {
+  description = "Azure Container Registry name"
+  value       = var.deploy_to_azure ? azurerm_container_registry.main[0].name : null
+}
+
+output "vnet_id" {
+  description = "Virtual Network ID"
+  value       = var.deploy_to_azure ? azurerm_virtual_network.main[0].id : null
+}
+
+output "postgresql_status" {
+  description = "Status of PostgreSQL helm release"
+  value       = var.deploy_postgresql_via_helm ? helm_release.postgresql[0].status : "Not deployed via Helm"
+}
+
+output "redis_status" {
+  description = "Status of Redis helm release"
+  value       = var.deploy_redis_via_helm ? helm_release.redis[0].status : "Not deployed via Helm"
+}
+

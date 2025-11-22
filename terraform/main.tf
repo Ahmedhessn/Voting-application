@@ -46,6 +46,106 @@ resource "azurerm_resource_group" "main" {
   }
 }
 
+# Azure Container Registry
+resource "azurerm_container_registry" "main" {
+  count               = var.deploy_to_azure ? 1 : 0
+  name                = "${var.project_name}${var.environment}acr"
+  resource_group_name = azurerm_resource_group.main[0].name
+  location            = azurerm_resource_group.main[0].location
+  sku                 = var.environment == "prod" ? "Premium" : "Basic"
+  admin_enabled       = true
+
+  tags = {
+    Environment = var.environment
+    Project     = var.project_name
+    ManagedBy   = "Terraform"
+  }
+}
+
+# Virtual Network for AKS
+resource "azurerm_virtual_network" "main" {
+  count               = var.deploy_to_azure ? 1 : 0
+  name                = "${var.project_name}-${var.environment}-vnet"
+  address_space       = [var.vnet_address_space]
+  location            = azurerm_resource_group.main[0].location
+  resource_group_name = azurerm_resource_group.main[0].name
+
+  tags = {
+    Environment = var.environment
+    Project     = var.project_name
+    ManagedBy     = "Terraform"
+  }
+}
+
+# Subnet for AKS
+resource "azurerm_subnet" "aks" {
+  count                = var.deploy_to_azure ? 1 : 0
+  name                 = "${var.project_name}-${var.environment}-aks-subnet"
+  resource_group_name  = azurerm_resource_group.main[0].name
+  virtual_network_name = azurerm_virtual_network.main[0].name
+  address_prefixes     = [var.aks_subnet_address_prefix]
+}
+
+# Network Security Group for AKS
+resource "azurerm_network_security_group" "aks" {
+  count               = var.deploy_to_azure ? 1 : 0
+  name                = "${var.project_name}-${var.environment}-aks-nsg"
+  location            = azurerm_resource_group.main[0].location
+  resource_group_name = azurerm_resource_group.main[0].name
+
+  # Allow inbound HTTPS
+  security_rule {
+    name                       = "AllowHTTPS"
+    priority                   = 1000
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "443"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  # Allow inbound HTTP
+  security_rule {
+    name                       = "AllowHTTP"
+    priority                   = 1001
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range    = "80"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  # Allow inbound SSH (for node access)
+  security_rule {
+    name                       = "AllowSSH"
+    priority                   = 1002
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range    = "22"
+    source_address_prefix      = var.allowed_ssh_source_ip
+    destination_address_prefix = "*"
+  }
+
+  tags = {
+    Environment = var.environment
+    Project     = var.project_name
+    ManagedBy   = "Terraform"
+  }
+}
+
+# Associate NSG with subnet
+resource "azurerm_subnet_network_security_group_association" "aks" {
+  count                     = var.deploy_to_azure ? 1 : 0
+  subnet_id                 = azurerm_subnet.aks[0].id
+  network_security_group_id = azurerm_network_security_group.aks[0].id
+}
+
 # AKS Cluster
 resource "azurerm_kubernetes_cluster" "main" {
   count               = var.deploy_to_azure ? 1 : 0
@@ -64,24 +164,46 @@ resource "azurerm_kubernetes_cluster" "main" {
     max_count           = var.enable_auto_scaling ? var.max_node_count : null
     os_disk_size_gb     = var.os_disk_size_gb
     type                = "VirtualMachineScaleSets"
+    vnet_subnet_id      = azurerm_subnet.aks[0].id
   }
 
   identity {
     type = "SystemAssigned"
   }
 
+  # Attach ACR
+  role_based_access_control_enabled = true
+
   network_profile {
-    network_plugin    = "kubenet"
+    network_plugin    = "azure"
+    network_policy    = "azure"
     load_balancer_sku = "standard"
+    service_cidr      = var.service_cidr
+    dns_service_ip    = var.dns_service_ip
   }
 
-  role_based_access_control_enabled = true
+  # Enable Azure Policy
+  azure_policy_enabled = var.enable_azure_policy
+
+  # Enable OMS (Azure Monitor)
+  oms_agent {
+    enabled                    = var.enable_azure_monitor
+    log_analytics_workspace_id = var.enable_azure_monitor && var.log_analytics_workspace_id != "" ? var.log_analytics_workspace_id : null
+  }
 
   tags = {
     Environment = var.environment
     Project     = var.project_name
     ManagedBy   = "Terraform"
   }
+}
+
+# Grant AKS access to ACR
+resource "azurerm_role_assignment" "aks_acr" {
+  count                = var.deploy_to_azure ? 1 : 0
+  principal_id         = azurerm_kubernetes_cluster.main[0].identity[0].principal_id
+  role_definition_name = "AcrPull"
+  scope                = azurerm_container_registry.main[0].id
 }
 
 # Kubernetes provider configuration
@@ -117,12 +239,196 @@ resource "helm_release" "ingress_nginx" {
 
   set {
     name  = "controller.service.type"
-    value = "LoadBalancer"
+    value = var.deploy_to_azure ? "LoadBalancer" : "NodePort"
   }
 
   set {
     name  = "controller.admissionWebhooks.enabled"
     value = "false"
   }
+
+  set {
+    name  = "controller.metrics.enabled"
+    value = "true"
+  }
+
+  set {
+    name  = "controller.podSecurityPolicy.enabled"
+    value = "false"
+  }
+
+  depends_on = [
+    azurerm_kubernetes_cluster.main
+  ]
+}
+
+# PostgreSQL via Bitnami Helm Chart
+resource "helm_release" "postgresql" {
+  count      = var.deploy_postgresql_via_helm ? 1 : 0
+  name        = "postgresql"
+  repository  = "https://charts.bitnami.com/bitnami"
+  chart       = "postgresql"
+  version     = "12.1.0"
+  namespace   = "voting-app"
+  create_namespace = true
+
+  set {
+    name  = "auth.database"
+    value = "postgres"
+  }
+
+  set {
+    name  = "auth.username"
+    value = "postgres"
+  }
+
+  set {
+    name  = "auth.password"
+    value = var.postgres_password
+  }
+
+  set {
+    name  = "primary.persistence.enabled"
+    value = "true"
+  }
+
+  set {
+    name  = "primary.persistence.size"
+    value = var.environment == "prod" ? "50Gi" : "10Gi"
+  }
+
+  set {
+    name  = "primary.persistence.storageClass"
+    value = var.deploy_to_azure ? "managed-csi" : ""
+  }
+
+  set {
+    name  = "primary.resources.requests.memory"
+    value = var.environment == "prod" ? "512Mi" : "256Mi"
+  }
+
+  set {
+    name  = "primary.resources.requests.cpu"
+    value = var.environment == "prod" ? "500m" : "250m"
+  }
+
+  set {
+    name  = "primary.resources.limits.memory"
+    value = var.environment == "prod" ? "2Gi" : "512Mi"
+  }
+
+  set {
+    name  = "primary.resources.limits.cpu"
+    value = var.environment == "prod" ? "2000m" : "1000m"
+  }
+
+  set {
+    name  = "primary.podSecurityContext.enabled"
+    value = "true"
+  }
+
+  set {
+    name  = "primary.podSecurityContext.fsGroup"
+    value = "999"
+  }
+
+  set {
+    name  = "primary.containerSecurityContext.enabled"
+    value = "true"
+  }
+
+  set {
+    name  = "primary.containerSecurityContext.runAsUser"
+    value = "999"
+  }
+
+  set {
+    name  = "primary.containerSecurityContext.runAsNonRoot"
+    value = "true"
+  }
+
+  depends_on = [
+    helm_release.ingress_nginx
+  ]
+}
+
+# Redis via Bitnami Helm Chart
+resource "helm_release" "redis" {
+  count      = var.deploy_redis_via_helm ? 1 : 0
+  name       = "redis"
+  repository = "https://charts.bitnami.com/bitnami"
+  chart      = "redis"
+  version    = "17.15.0"
+  namespace  = "voting-app"
+  create_namespace = true
+
+  set {
+    name  = "auth.enabled"
+    value = "false"
+  }
+
+  set {
+    name  = "master.persistence.enabled"
+    value = var.environment == "prod" ? "true" : "false"
+  }
+
+  set {
+    name  = "master.persistence.size"
+    value = "10Gi"
+  }
+
+  set {
+    name  = "master.persistence.storageClass"
+    value = var.deploy_to_azure ? "managed-csi" : ""
+  }
+
+  set {
+    name  = "master.resources.requests.memory"
+    value = var.environment == "prod" ? "256Mi" : "128Mi"
+  }
+
+  set {
+    name  = "master.resources.requests.cpu"
+    value = var.environment == "prod" ? "200m" : "100m"
+  }
+
+  set {
+    name  = "master.resources.limits.memory"
+    value = var.environment == "prod" ? "512Mi" : "256Mi"
+  }
+
+  set {
+    name  = "master.resources.limits.cpu"
+    value = var.environment == "prod" ? "1000m" : "500m"
+  }
+
+  set {
+    name  = "master.podSecurityContext.enabled"
+    value = "true"
+  }
+
+  set {
+    name  = "master.podSecurityContext.fsGroup"
+    value = "999"
+  }
+
+  set {
+    name  = "master.containerSecurityContext.enabled"
+    value = "true"
+  }
+
+  set {
+    name  = "master.containerSecurityContext.runAsUser"
+    value = "999"
+  }
+
+  set {
+    name  = "master.containerSecurityContext.runAsNonRoot"
+    value = "true"
+  }
+
+  depends_on = [
+    helm_release.ingress_nginx
+  ]
 }
 

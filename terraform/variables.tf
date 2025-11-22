@@ -81,3 +81,70 @@ variable "local_kubeconfig_context" {
   default     = ""
 }
 
+variable "vnet_address_space" {
+  description = "Address space for the virtual network"
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+variable "aks_subnet_address_prefix" {
+  description = "Address prefix for AKS subnet"
+  type        = string
+  default     = "10.0.1.0/24"
+}
+
+variable "service_cidr" {
+  description = "CIDR for Kubernetes services"
+  type        = string
+  default     = "10.1.0.0/16"
+}
+
+variable "dns_service_ip" {
+  description = "IP address for Kubernetes DNS service"
+  type        = string
+  default     = "10.1.0.10"
+}
+
+variable "allowed_ssh_source_ip" {
+  description = "Source IP address allowed for SSH access (use * for all)"
+  type        = string
+  default     = "*"
+}
+
+variable "enable_azure_policy" {
+  description = "Enable Azure Policy for Kubernetes"
+  type        = bool
+  default     = false
+}
+
+variable "enable_azure_monitor" {
+  description = "Enable Azure Monitor (OMS) for AKS"
+  type        = bool
+  default     = true
+}
+
+variable "log_analytics_workspace_id" {
+  description = "Log Analytics Workspace ID for Azure Monitor (optional)"
+  type        = string
+  default     = ""
+}
+
+variable "deploy_postgresql_via_helm" {
+  description = "Deploy PostgreSQL via Bitnami Helm chart (true) or use manifests (false)"
+  type        = bool
+  default     = true
+}
+
+variable "deploy_redis_via_helm" {
+  description = "Deploy Redis via Bitnami Helm chart (true) or use manifests (false)"
+  type        = bool
+  default     = true
+}
+
+variable "postgres_password" {
+  description = "PostgreSQL password (use Azure Key Vault in production)"
+  type        = string
+  sensitive   = true
+  default     = "postgres"
+}
+
